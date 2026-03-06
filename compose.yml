@@ -1,6 +1,6 @@
 services:
   frontend:
-    container_name: jobsearchagent-frontend
+    container_name: job-search-agent-frontend
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,13 +9,13 @@ services:
       - ./:/app/frontend
       - /app/frontend/node_modules
     environment:
-      - VITE_API_BASE_URL=http://jobsearchagent.local/api
+      - VITE_API_BASE_URL=http://job-search-agent.local/api
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.jobsearchagent-frontend.rule=Host(`jobsearchagent.local`)"
-      - "traefik.http.routers.jobsearchagent-frontend.priority=1"
-      - "traefik.http.services.jobsearchagent-frontend.loadbalancer.server.port=5173"
-      - "traefik.http.routers.jobsearchagent-frontend.entrypoints=web"
+      - "traefik.http.routers.job-search-agent-frontend.rule=Host(`job-search-agent.local`)"
+      - "traefik.http.routers.job-search-agent-frontend.priority=1"
+      - "traefik.http.services.job-search-agent-frontend.loadbalancer.server.port=5173"
+      - "traefik.http.routers.job-search-agent-frontend.entrypoints=web"
     expose:
       - 5173
     networks:

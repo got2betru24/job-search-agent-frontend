@@ -6,6 +6,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['jobsearchagent.local']
+    allowedHosts: ['job-search-agent.local']
   }
 })

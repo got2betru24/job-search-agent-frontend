@@ -142,7 +142,7 @@ The backend is a separate FastAPI (Python 3.13) service responsible for:
 - Calling the Anthropic API (Claude) for match scoring and resume tailoring
 - Exposing a REST API consumed by this frontend at `/api`
 
-> Backend repo: **job-search-agent-backend** *(link when published)*
+> Backend repo: [**job-search-agent-backend**](https://github.com/got2betru24/job-search-agent-backend)
 
 All API requests from the frontend are routed through Traefik via the `/api` path prefix — no direct frontend-to-backend networking configuration is needed.
 

@@ -1,5 +1,5 @@
 {
-  "name": "jobsearchagent-frontend",
+  "name": "job-search-agent-frontend",
   "dockerComposeFile": "../compose.yml",
   "service": "frontend",
   "workspaceFolder": "/app/frontend",
