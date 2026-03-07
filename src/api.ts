@@ -14,8 +14,27 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// ── Jobs ─────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────
+export interface ScrapeLog {
+  id: number;
+  source_id: number;
+  started_at: string;
+  finished_at: string;
+  status: "success" | "error" | "partial";
+  jobs_found: number;
+  jobs_added: number;
+  jobs_filtered: number;
+  jobs_skipped: number;
+  error_message: string | null;
+}
 
+export interface RawLogsResponse {
+  lines: string[];
+  total: number;
+  note: string;
+}
+
+// ── Jobs ─────────────────────────────────────────────────────
 export const api = {
   jobs: {
     list: (params?: { status?: JobStatus | "all"; role?: string }) => {
@@ -25,9 +44,7 @@ export const api = {
       const qs = query.toString();
       return request<Job[]>(`/jobs${qs ? `?${qs}` : ""}`);
     },
-
     get: (id: number) => request<Job>(`/jobs/${id}`),
-
     updateStatus: (id: number, status: JobStatus) =>
       request<Job>(`/jobs/${id}/status`, {
         method: "PATCH",
@@ -54,7 +71,27 @@ export const api = {
 
   // ── Scraper ───────────────────────────────────────────────
   scraper: {
-    runAll: () => request<{ sources_scraped: number; results: object[] }>("/scraper/run", { method: "POST" }),
-    runOne: (sourceId: number) => request<object>(`/scraper/run/${sourceId}`, { method: "POST" }),
+    runAll: () =>
+      request<{ sources_scraped: number; results: object[] }>("/scraper/run", { method: "POST" }),
+    runOne: (sourceId: number) =>
+      request<object>(`/scraper/run/${sourceId}`, { method: "POST" }),
+
+    logs: (limit = 200) =>
+      request<ScrapeLog[]>(`/scraper/logs?limit=${limit}`),
+
+    rawLogs: (params?: {
+      source?: string;
+      level?: string;
+      filter_type?: "filtered";
+      limit?: number;
+    }) => {
+      const query = new URLSearchParams();
+      if (params?.source) query.set("source", params.source);
+      if (params?.level) query.set("level", params.level);
+      if (params?.filter_type) query.set("filter_type", params.filter_type);
+      if (params?.limit) query.set("limit", String(params.limit));
+      const qs = query.toString();
+      return request<RawLogsResponse>(`/scraper/logs/raw${qs ? `?${qs}` : ""}`);
+    },
   },
 };
