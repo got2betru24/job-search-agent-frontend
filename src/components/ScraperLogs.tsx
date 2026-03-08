@@ -1,45 +1,60 @@
 import { useEffect, useState, useRef } from "react";
 import { api, ScrapeLog, RawLogsResponse } from "../api";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+import { formatDateTime, formatDuration } from "../utils/dateUtils";
 
-function formatDuration(started: string, finished: string): string {
-  const ms = new Date(finished).getTime() - new Date(started).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+// ── Log line parser ───────────────────────────────────────────────────────────
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
+type Segment = { text: string; cls: string };
 
-function classifyLine(line: string): "filtered" | "error" | "http" | "info" | "other" {
-  if (line.includes("FILTERED")) return "filtered";
-  if (line.includes("[ERROR]")) return "error";
-  if (line.includes("HTTP Request:")) return "http";
-  if (line.includes("[INFO]")) return "info";
-  return "other";
-}
+// Matches: "2026-03-07 22:00:24,358 [INFO] [SoFi] FILTERED location=...: 'Title'"
+const LOG_RE =
+  /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+(\[\w+\])\s+(\[\w[\w\s\-&.]*\])\s*(.*)?$/;
 
-function LineColorClass(type: ReturnType<typeof classifyLine>): string {
-  switch (type) {
-    case "filtered": return "log-line--filtered";
-    case "error":    return "log-line--error";
-    case "http":     return "log-line--http";
-    case "info":     return "log-line--info";
-    default:         return "log-line--other";
-  }
+function parseLine(line: string): Segment[] {
+  const m = line.match(LOG_RE);
+  if (!m) return [{ text: line, cls: "ll-other" }];
+
+  const [, timestamp, level, source, rest = ""] = m;
+
+  const levelCls =
+    level === "[ERROR]"
+      ? "ll-level-error"
+      : level === "[WARNING]"
+      ? "ll-level-warn"
+      : "ll-level-info";
+
+  // Classify the message keyword
+  let msgCls = "ll-msg";
+  if (rest.startsWith("FILTERED")) msgCls = "ll-filtered";
+  else if (rest.startsWith("ADDED")) msgCls = "ll-added";
+  else if (rest.startsWith("SKIPPED")) msgCls = "ll-skipped";
+  else if (rest.startsWith("Found ")) msgCls = "ll-found";
+  else if (rest.startsWith("HTTP Request:")) msgCls = "ll-http";
+  else if (rest.startsWith("Using ")) msgCls = "ll-meta";
+
+  return [
+    { text: timestamp, cls: "ll-timestamp" },
+    { text: " ", cls: "" },
+    { text: level, cls: levelCls },
+    { text: " ", cls: "" },
+    { text: source, cls: "ll-source" },
+    { text: " ", cls: "" },
+    { text: rest, cls: msgCls },
+  ];
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatPill({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function StatPill({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
   return (
     <span className={`stat-pill ${highlight ? "stat-pill--highlight" : ""}`}>
       <span className="stat-pill__value">{value}</span>
@@ -50,29 +65,36 @@ function StatPill({ label, value, highlight }: { label: string; value: number; h
 
 function RunRow({
   log,
+  company,
   selected,
   onClick,
 }: {
   log: ScrapeLog;
+  company?: string;
   selected: boolean;
   onClick: () => void;
 }) {
-  const addRatio = log.jobs_found > 0
-    ? Math.round((log.jobs_added / log.jobs_found) * 100)
-    : 0;
-
   return (
     <button
-      className={`run-row ${selected ? "run-row--selected" : ""} ${log.status === "error" ? "run-row--error" : ""}`}
+      className={`run-row ${selected ? "run-row--selected" : ""} ${
+        log.status === "error" ? "run-row--error" : ""
+      }`}
       onClick={onClick}
     >
       <div className="run-row__top">
-        <span className="run-row__time">{formatTime(log.started_at)}</span>
-        <span className={`run-row__badge run-row__badge--${log.status}`}>{log.status}</span>
+        <span className="run-row__time">{formatDateTime(log.started_at)}</span>
+        <span className={`run-row__badge run-row__badge--${log.status}`}>
+          {log.status}
+        </span>
       </div>
+      {company && <div className="run-row__company">{company}</div>}
       <div className="run-row__stats">
         <StatPill label="found" value={log.jobs_found} />
-        <StatPill label="added" value={log.jobs_added} highlight={log.jobs_added > 0} />
+        <StatPill
+          label="added"
+          value={log.jobs_added}
+          highlight={log.jobs_added > 0}
+        />
         <StatPill label="filtered" value={log.jobs_filtered} />
         {log.finished_at && (
           <span className="run-row__duration">
@@ -94,23 +116,27 @@ type RawFilter = "all" | "filtered" | "added" | "errors";
 export default function ScraperLogs() {
   const [logs, setLogs] = useState<ScrapeLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<ScrapeLog | null>(null);
+  const [sourceMap, setSourceMap] = useState<Record<number, string>>({});
   const [rawData, setRawData] = useState<RawLogsResponse | null>(null);
   const [rawFilter, setRawFilter] = useState<RawFilter>("all");
   const [sourceFilter, setSourceFilter] = useState("");
+  const [runFilter, setRunFilter] = useState("");
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [loadingRaw, setLoadingRaw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // Load DB run history
+  // Load DB run history + sources map
   useEffect(() => {
     setLoadingLogs(true);
-    api.scraper
-      .logs(200)
-      .then((data) => {
-        setLogs(data);
-        // Auto-select most recent
-        if (data.length > 0) setSelectedLog(data[0]);
+    Promise.all([api.scraper.logs(200), api.sources.list()])
+      .then(([logData, sourcesData]) => {
+        setLogs(logData);
+        const map: Record<number, string> = {};
+        sourcesData.forEach((s) => {
+          map[s.id] = s.company;
+        });
+        setSourceMap(map);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoadingLogs(false));
@@ -121,7 +147,7 @@ export default function ScraperLogs() {
     setLoadingRaw(true);
     setRawData(null);
 
-    const params: Parameters<typeof api.scraper.rawLogs>[0] = { limit: 3000 };
+    const params: Parameters<typeof api.scraper.rawLogs>[0] = { limit: 5000 };
     if (sourceFilter.trim()) params.source = sourceFilter.trim();
     // "filtered" and "errors" are server-side filters; "added" is client-side
     if (rawFilter === "filtered") params.filter_type = "filtered";
@@ -141,9 +167,24 @@ export default function ScraperLogs() {
     }
   }, [rawData]);
 
-  const filteredLines = rawFilter === "added"
-    ? (rawData?.lines ?? []).filter(l => l.includes("] ADDED "))
-    : rawData?.lines ?? [];
+  const filteredLines =
+    rawFilter === "added"
+      ? (rawData?.lines ?? []).filter((l) => l.includes("] ADDED "))
+      : rawData?.lines ?? [];
+
+  const visibleLogs = runFilter.trim()
+    ? logs.filter((l) =>
+        sourceMap[l.source_id]
+          ?.toLowerCase()
+          .includes(runFilter.trim().toLowerCase())
+      )
+    : logs;
+
+  function handleRowClick(log: ScrapeLog) {
+    setSelectedLog(log);
+    const company = sourceMap[log.source_id];
+    if (company) setSourceFilter(company);
+  }
 
   return (
     <div className="scraper-logs">
@@ -157,13 +198,58 @@ export default function ScraperLogs() {
         {loadingLogs && <div className="panel-loading">Loading…</div>}
         {error && <div className="panel-error">{error}</div>}
 
+        <div className="filter-search">
+          <svg
+            className="filter-search-icon"
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="filter-search-input"
+            type="text"
+            placeholder="Filter by source…"
+            value={runFilter}
+            onChange={(e) => setRunFilter(e.target.value)}
+          />
+          {runFilter && (
+            <button
+              className="filter-search-clear"
+              onClick={() => setRunFilter("")}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </div>
+
         <div className="run-list">
-          {logs.map((log) => (
+          {visibleLogs.map((log) => (
             <RunRow
               key={log.id}
               log={log}
+              company={sourceMap[log.source_id]}
               selected={selectedLog?.id === log.id}
-              onClick={() => setSelectedLog(log)}
+              onClick={() => handleRowClick(log)}
             />
           ))}
           {!loadingLogs && logs.length === 0 && (
@@ -180,23 +266,55 @@ export default function ScraperLogs() {
             <span className="panel-subtitle">most recent run only</span>
           </div>
           <div className="log-controls">
-            <input
-              className="log-search"
-              type="text"
-              placeholder="Filter by source…"
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-            />
-            <div className="log-filter-tabs">
-              {(["all", "filtered", "added", "errors"] as RawFilter[]).map((f) => (
+            <div className="log-search-wrap">
+              <input
+                className="log-search"
+                type="text"
+                placeholder="Filter by source…"
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+              />
+              {sourceFilter && (
                 <button
-                  key={f}
-                  className={`filter-tab ${rawFilter === f ? "filter-tab--active" : ""}`}
-                  onClick={() => setRawFilter(f)}
+                  className="log-search-clear"
+                  onClick={() => setSourceFilter("")}
                 >
-                  {f === "filtered" ? "Filtered" : f === "added" ? "Added" : f === "errors" ? "Errors" : "All"}
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
-              ))}
+              )}
+            </div>
+            <div className="log-filter-tabs">
+              {(["all", "filtered", "added", "errors"] as RawFilter[]).map(
+                (f) => (
+                  <button
+                    key={f}
+                    className={`filter-tab ${
+                      rawFilter === f ? "filter-tab--active" : ""
+                    }`}
+                    onClick={() => setRawFilter(f)}
+                  >
+                    {f === "filtered"
+                      ? "Filtered"
+                      : f === "added"
+                      ? "Added"
+                      : f === "errors"
+                      ? "Errors"
+                      : "All"}
+                  </button>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -214,11 +332,21 @@ export default function ScraperLogs() {
                   <div className="panel-empty">No matching lines.</div>
                 ) : (
                   filteredLines.map((line, i) => {
-                    const type = classifyLine(line);
+                    const segments = parseLine(line);
                     return (
-                      <div key={i} className={`log-line ${LineColorClass(type)}`}>
+                      <div key={i} className="log-line">
                         <span className="log-line__num">{i + 1}</span>
-                        <span className="log-line__text">{line}</span>
+                        <span className="log-line__text">
+                          {segments.map((seg, j) =>
+                            seg.cls ? (
+                              <span key={j} className={seg.cls}>
+                                {seg.text}
+                              </span>
+                            ) : (
+                              seg.text
+                            )
+                          )}
+                        </span>
                       </div>
                     );
                   })

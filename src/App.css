@@ -1270,6 +1270,13 @@ html, body, #root {
   gap: 5px;
   flex-wrap: wrap;
 }
+.run-row__company {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+  font-family: var(--font-sans);
+}
 .run-row__duration {
   font-size: 10px;
   color: var(--text-muted);
@@ -1330,6 +1337,29 @@ html, body, #root {
 }
 .log-search:focus { border-color: var(--accent); }
 .log-search::placeholder { color: var(--text-muted); }
+.log-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.log-search-wrap .log-search {
+  padding-right: 28px;
+}
+.log-search-clear {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 3px;
+  transition: color 0.12s;
+}
+.log-search-clear:hover { color: var(--text-primary); }
 
 /* ── Log viewer ── */
 .log-viewer {
@@ -1352,7 +1382,7 @@ html, body, #root {
   overflow-y: auto;
   padding: 6px 0;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.6;
 }
 .log-lines::-webkit-scrollbar { width: 4px; }
@@ -1380,12 +1410,20 @@ html, body, #root {
   word-break: break-all;
 }
 
-/* Line type colors */
-.log-line--filtered .log-line__text { color: #d29922; }
-.log-line--error    .log-line__text { color: #e05252; }
-.log-line--http     .log-line__text { color: var(--text-muted); font-size: 10.5px; }
-.log-line--info     .log-line__text { color: var(--text-secondary); }
-.log-line--other    .log-line__text { color: var(--text-muted); }
+/* ── Log line segment colors ── */
+.ll-timestamp   { color: var(--text-muted); opacity: 0.6; }
+.ll-level-info  { color: var(--text-muted); }
+.ll-level-warn  { color: #d29922; }
+.ll-level-error { color: #e05252; }
+.ll-source      { color: var(--accent); font-weight: 500; }
+.ll-filtered    { color: #d29922; }
+.ll-added       { color: #10b981; }
+.ll-skipped     { color: #a78bfa; }
+.ll-found       { color: var(--text-primary); }
+.ll-http        { color: var(--text-muted); opacity: 0.5; font-size: 11px; }
+.ll-meta        { color: var(--text-muted); }
+.ll-msg         { color: var(--text-secondary); }
+.ll-other       { color: var(--text-muted); }
 
 /* ── Log filter tabs (override shared .filter-tabs for log context) ── */
 .log-filter-tabs {

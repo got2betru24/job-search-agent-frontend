@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Job, JobRole, JobStatus, JOB_ROLE_COLORS, JOB_ROLE_SHORT } from "../types";
+import {
+  Job,
+  JobRole,
+  JobStatus,
+  JOB_ROLE_COLORS,
+  JOB_ROLE_SHORT,
+} from "../types";
 import { api } from "../api";
+
+import { formatDate } from "../utils/dateUtils";
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   new: "New",
@@ -28,11 +36,19 @@ function renderMarkdown(md: string): string {
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/((?:^[*\-] .+$\n?)+)/gm, (block) => {
-      const items = block.trim().split("\n").map(l => `<li>${l.replace(/^[*\-] /, "")}</li>`).join("");
+      const items = block
+        .trim()
+        .split("\n")
+        .map((l) => `<li>${l.replace(/^[*\-] /, "")}</li>`)
+        .join("");
       return `<ul>${items}</ul>`;
     })
     .replace(/((?:^\d+\. .+$\n?)+)/gm, (block) => {
-      const items = block.trim().split("\n").map(l => `<li>${l.replace(/^\d+\. /, "")}</li>`).join("");
+      const items = block
+        .trim()
+        .split("\n")
+        .map((l) => `<li>${l.replace(/^\d+\. /, "")}</li>`)
+        .join("");
       return `<ol>${items}</ol>`;
     })
     .replace(/(?<!\>)\n\n(?!\<)/g, "</p><p>")
@@ -51,22 +67,32 @@ function MarkdownBody({ content }: { content: string }) {
 // ── Apply modal ───────────────────────────────────────────────────────────────
 function ApplyModal({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onNo(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onNo();
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onNo]);
 
   return (
     <div className="modal-backdrop" onClick={onNo}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} width={22} height={22}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            width={22}
+            height={22}
+          >
             <path d="M20 6L9 17l-5-5" />
           </svg>
         </div>
         <h2 className="modal-title">Did you apply?</h2>
         <p className="modal-body">
-          Mark this job as <strong>Applied</strong> to track it in your pipeline.
+          Mark this job as <strong>Applied</strong> to track it in your
+          pipeline.
         </p>
         <div className="modal-actions">
           <button className="modal-btn modal-btn-yes" onClick={onYes}>
@@ -87,9 +113,14 @@ function MatchBar({ score }: { score: number }) {
   return (
     <div className="match-bar-wrap" title={`${score}% match`}>
       <div className="match-bar-bg">
-        <div className="match-bar-fill" style={{ width: `${score}%`, background: color }} />
+        <div
+          className="match-bar-fill"
+          style={{ width: `${score}%`, background: color }}
+        />
       </div>
-      <span className="match-score" style={{ color }}>{score}%</span>
+      <span className="match-score" style={{ color }}>
+        {score}%
+      </span>
     </div>
   );
 }
@@ -97,15 +128,31 @@ function MatchBar({ score }: { score: number }) {
 function RolePill({ role }: { role: JobRole }) {
   const color = JOB_ROLE_COLORS[role];
   return (
-    <span className="role-pill" style={{ color, borderColor: color + "44", background: color + "18" }}>
+    <span
+      className="role-pill"
+      style={{ color, borderColor: color + "44", background: color + "18" }}
+    >
       {JOB_ROLE_SHORT[role]}
     </span>
   );
 }
 
-function JobCard({ job, selected, onClick }: { job: Job; selected: boolean; onClick: () => void }) {
+function JobCard({
+  job,
+  selected,
+  onClick,
+}: {
+  job: Job;
+  selected: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button className={`job-card ${selected ? "selected" : ""} ${job.status === "archived" ? "archived" : ""}`} onClick={onClick}>
+    <button
+      className={`job-card ${selected ? "selected" : ""} ${
+        job.status === "archived" ? "archived" : ""
+      }`}
+      onClick={onClick}
+    >
       <div className="job-card-header">
         <div className="job-card-titles">
           <span className="job-title">{job.title}</span>
@@ -113,19 +160,33 @@ function JobCard({ job, selected, onClick }: { job: Job; selected: boolean; onCl
         </div>
         <div className="job-card-badges">
           {job.role && <RolePill role={job.role} />}
-          <span className="status-badge" style={{ color: STATUS_COLORS[job.status], borderColor: STATUS_COLORS[job.status] + "44", background: STATUS_COLORS[job.status] + "18" }}>
+          <span
+            className="status-badge"
+            style={{
+              color: STATUS_COLORS[job.status],
+              borderColor: STATUS_COLORS[job.status] + "44",
+              background: STATUS_COLORS[job.status] + "18",
+            }}
+          >
             {STATUS_LABELS[job.status]}
           </span>
         </div>
       </div>
       <div className="job-card-meta">
         <span className="meta-tag">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} width={11} height={11}>
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            width={11}
+            height={11}
+          >
             <rect x="1" y="2" width="14" height="12" rx="2" />
             <path d="M1 6h14" />
             <path d="M5 1v2M11 1v2" />
           </svg>
-          {new Date(job.found_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          {formatDate(job.found_at)}
         </span>
       </div>
       {job.match_score != null && <MatchBar score={job.match_score} />}
@@ -155,7 +216,11 @@ function JobDetail({ job }: { job: Job }) {
   };
 
   return (
-    <div className={`job-detail ${job.status === "archived" ? "detail-archived" : ""}`}>
+    <div
+      className={`job-detail ${
+        job.status === "archived" ? "detail-archived" : ""
+      }`}
+    >
       {showApplyModal && (
         <ApplyModal
           onYes={handleApplyYes}
@@ -171,14 +236,37 @@ function JobDetail({ job }: { job: Job }) {
           </div>
           <div className="detail-meta-row">
             <span className="detail-company">{job.company ?? "—"}</span>
-            {job.location && <><span className="detail-dot">·</span><span className="detail-location">{job.location}</span></>}
-            {job.job_type && <><span className="detail-dot">·</span><span className="detail-type">{job.job_type}</span></>}
-            {job.salary && <><span className="detail-dot">·</span><span className="detail-salary">{job.salary}</span></>}
+            {job.location && (
+              <>
+                <span className="detail-dot">·</span>
+                <span className="detail-location">{job.location}</span>
+              </>
+            )}
+            {job.job_type && (
+              <>
+                <span className="detail-dot">·</span>
+                <span className="detail-type">{job.job_type}</span>
+              </>
+            )}
+            {job.salary && (
+              <>
+                <span className="detail-dot">·</span>
+                <span className="detail-salary">{job.salary}</span>
+              </>
+            )}
           </div>
           <div className="detail-source">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} width={12} height={12}>
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              width={12}
+              height={12}
+            >
               <path d="M6 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3" />
-              <path d="M10 1h5v5" /><path d="M15 1L7 9" />
+              <path d="M10 1h5v5" />
+              <path d="M15 1L7 9" />
             </svg>
             <a
               href={job.job_url}
@@ -200,7 +288,14 @@ function JobDetail({ job }: { job: Job }) {
               disabled={statusMutation.isPending}
               title="Save this job"
             >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.75} width={12} height={12}>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                width={12}
+                height={12}
+              >
                 <path d="M3 2h10a1 1 0 0 1 1 1v11l-6-3-6 3V3a1 1 0 0 1 1-1z" />
               </svg>
               Save
@@ -213,7 +308,14 @@ function JobDetail({ job }: { job: Job }) {
               disabled={statusMutation.isPending}
               title="Archive this job"
             >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.75} width={12} height={12}>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                width={12}
+                height={12}
+              >
                 <rect x="1" y="3" width="14" height="3" rx="1" />
                 <path d="M2 6v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6" />
                 <path d="M6 9h4" />
@@ -224,16 +326,27 @@ function JobDetail({ job }: { job: Job }) {
           <select
             className="status-select"
             value={job.status}
-            onChange={e => statusMutation.mutate(e.target.value as JobStatus)}
+            onChange={(e) => statusMutation.mutate(e.target.value as JobStatus)}
             disabled={statusMutation.isPending}
           >
             {Object.entries(STATUS_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>{label}</option>
+              <option key={val} value={val}>
+                {label}
+              </option>
             ))}
           </select>
           {job.status !== "archived" && (
             <button className="btn-tailor" disabled>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.75} width={13} height={13}><path d="M13 2L3 8l3 1.5L7.5 13 13 2z" /></svg>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                width={13}
+                height={13}
+              >
+                <path d="M13 2L3 8l3 1.5L7.5 13 13 2z" />
+              </svg>
               Tailor Resume
             </button>
           )}
@@ -242,7 +355,8 @@ function JobDetail({ job }: { job: Job }) {
 
       {job.status === "archived" && (
         <div className="archived-banner">
-          This job has been archived. It will remain in the database but won't appear as new again.
+          This job has been archived. It will remain in the database but won't
+          appear as new again.
         </div>
       )}
 
@@ -250,8 +364,16 @@ function JobDetail({ job }: { job: Job }) {
         <div className="detail-body">
           {job.scrape_status === "pending" && (
             <div className="base-resume-indicator">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} width={12} height={12}>
-                <circle cx="8" cy="8" r="7" /><path d="M8 5v3l2 2" />
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                width={12}
+                height={12}
+              >
+                <circle cx="8" cy="8" r="7" />
+                <path d="M8 5v3l2 2" />
               </svg>
               Full job details are being scraped and will appear shortly.
             </div>
@@ -266,7 +388,9 @@ function JobDetail({ job }: { job: Job }) {
             <section className="detail-section">
               <h3 className="section-label">Requirements</h3>
               <ul className="requirements-list">
-                {job.requirements.map((req, i) => <li key={i}>{req}</li>)}
+                {job.requirements.map((req, i) => (
+                  <li key={i}>{req}</li>
+                ))}
               </ul>
             </section>
           )}
@@ -274,10 +398,23 @@ function JobDetail({ job }: { job: Job }) {
             <section className="detail-section">
               <h3 className="section-label">Match Analysis</h3>
               <div className="match-analysis">
-                <div className="match-score-big" style={{ color: job.match_score >= 85 ? "#10b981" : job.match_score >= 70 ? "#f59e0b" : "#ef4444" }}>
+                <div
+                  className="match-score-big"
+                  style={{
+                    color:
+                      job.match_score >= 85
+                        ? "#10b981"
+                        : job.match_score >= 70
+                        ? "#f59e0b"
+                        : "#ef4444",
+                  }}
+                >
                   {job.match_score}%
                 </div>
-                <p className="match-note">Claude's analysis of how well your base resume matches this job description.</p>
+                <p className="match-note">
+                  Claude's analysis of how well your base resume matches this
+                  job description.
+                </p>
               </div>
             </section>
           )}
@@ -300,16 +437,21 @@ export default function JobBoard() {
   const [companyFilter, setCompanyFilter] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: rawJobs = [], isLoading, isError } = useQuery({
+  const {
+    data: rawJobs = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["jobs", statusFilter, roleFilter],
-    queryFn: () => api.jobs.list({
-      status: statusFilter,
-      role: roleFilter !== "all" ? roleFilter : undefined,
-    }),
+    queryFn: () =>
+      api.jobs.list({
+        status: statusFilter,
+        role: roleFilter !== "all" ? roleFilter : undefined,
+      }),
   });
 
   const jobs = companyFilter.trim()
-    ? rawJobs.filter(j =>
+    ? rawJobs.filter((j) =>
         j.company?.toLowerCase().includes(companyFilter.trim().toLowerCase())
       )
     : rawJobs;
@@ -349,13 +491,15 @@ export default function JobBoard() {
     },
   });
 
-  const selected = jobs.find(j => j.id === selectedId) ?? jobs[0] ?? null;
+  const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0] ?? null;
   // Count against rawJobs so counts are unaffected by company filter
-  const countFor = (s: JobStatus) => rawJobs.filter(j => j.status === s).length;
-  const countByRole = (role: JobRole) => jobs.filter(j => j.role === role).length;
+  const countFor = (s: JobStatus) =>
+    rawJobs.filter((j) => j.status === s).length;
+  const countByRole = (role: JobRole) =>
+    jobs.filter((j) => j.role === role).length;
 
   if (isLoading) return <div className="detail-empty">Loading jobs...</div>;
-  if (isError)   return <div className="detail-empty">Failed to load jobs.</div>;
+  if (isError) return <div className="detail-empty">Failed to load jobs.</div>;
 
   return (
     <div className="split-pane">
@@ -368,8 +512,20 @@ export default function JobBoard() {
             onClick={() => scrapeMutation.mutate()}
             disabled={isScraping || scrapeMutation.isPending}
           >
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.75} width={14} height={14}
-              style={{ animation: (isScraping || scrapeMutation.isPending) ? "spin 0.7s linear infinite" : "none" }}>
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              width={14}
+              height={14}
+              style={{
+                animation:
+                  isScraping || scrapeMutation.isPending
+                    ? "spin 0.7s linear infinite"
+                    : "none",
+              }}
+            >
               <path d="M1 4s1.5-3 7-3a7 7 0 1 1-5.1 2.2" />
               <polyline points="1,1 1,4 4,4" />
             </svg>
@@ -378,35 +534,52 @@ export default function JobBoard() {
 
         {/* Row 1: Status filter */}
         <div className="filter-tabs">
-          {(["all", "new", "saved", "applied", "archived"] as const).map(s => (
-            <button
-              key={s}
-              className={`filter-tab ${statusFilter === s ? "active" : ""}`}
-              onClick={() => setStatusFilter(s)}
-            >
-              {s === "all" ? "All" : STATUS_LABELS[s]}
-              {s !== "archived" && (
-                <span className="filter-count">
-                  {s === "all" ? rawJobs.length : countFor(s)}
-                </span>
-              )}
-            </button>
-          ))}
+          {(["all", "new", "saved", "applied", "archived"] as const).map(
+            (s) => (
+              <button
+                key={s}
+                className={`filter-tab ${statusFilter === s ? "active" : ""}`}
+                onClick={() => setStatusFilter(s)}
+              >
+                {s === "all" ? "All" : STATUS_LABELS[s]}
+                {s !== "archived" && (
+                  <span className="filter-count">
+                    {s === "all" ? rawJobs.length : countFor(s)}
+                  </span>
+                )}
+              </button>
+            )
+          )}
         </div>
 
         {/* Row 2: Role filter */}
         <div className="filter-tabs filter-tabs-role">
-          <button className={`filter-tab ${roleFilter === "all" ? "active" : ""}`} onClick={() => setRoleFilter("all")}>
+          <button
+            className={`filter-tab ${roleFilter === "all" ? "active" : ""}`}
+            onClick={() => setRoleFilter("all")}
+          >
             All roles
           </button>
-          {(["engineering_manager", "product_manager", "engineer"] as JobRole[]).map(role => (
+          {(
+            ["engineering_manager", "product_manager", "engineer"] as JobRole[]
+          ).map((role) => (
             <button
               key={role}
               className={`filter-tab ${roleFilter === role ? "active" : ""}`}
               onClick={() => setRoleFilter(role)}
-              style={roleFilter === role ? { color: JOB_ROLE_COLORS[role], background: JOB_ROLE_COLORS[role] + "18" } : {}}
+              style={
+                roleFilter === role
+                  ? {
+                      color: JOB_ROLE_COLORS[role],
+                      background: JOB_ROLE_COLORS[role] + "18",
+                    }
+                  : {}
+              }
             >
-              <span className="role-dot" style={{ background: JOB_ROLE_COLORS[role] }} />
+              <span
+                className="role-dot"
+                style={{ background: JOB_ROLE_COLORS[role] }}
+              />
               {JOB_ROLE_SHORT[role]}
               <span className="filter-count">{countByRole(role)}</span>
             </button>
@@ -415,7 +588,15 @@ export default function JobBoard() {
 
         {/* Row 3: Company filter */}
         <div className="filter-search">
-          <svg className="filter-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} width={12} height={12}>
+          <svg
+            className="filter-search-icon"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            width={12}
+            height={12}
+          >
             <circle cx="6.5" cy="6.5" r="4.5" />
             <path d="M10 10l3 3" />
           </svg>
@@ -424,11 +605,22 @@ export default function JobBoard() {
             type="text"
             placeholder="Filter by company..."
             value={companyFilter}
-            onChange={e => setCompanyFilter(e.target.value)}
+            onChange={(e) => setCompanyFilter(e.target.value)}
           />
           {companyFilter && (
-            <button className="filter-search-clear" onClick={() => setCompanyFilter("")} title="Clear">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.75} width={10} height={10}>
+            <button
+              className="filter-search-clear"
+              onClick={() => setCompanyFilter("")}
+              title="Clear"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                width={10}
+                height={10}
+              >
                 <path d="M3 3l10 10M13 3L3 13" />
               </svg>
             </button>
@@ -437,9 +629,11 @@ export default function JobBoard() {
 
         <div className="job-list">
           {jobs.length === 0 ? (
-            <div className="detail-empty" style={{ height: "120px" }}>No jobs match these filters</div>
+            <div className="detail-empty" style={{ height: "120px" }}>
+              No jobs match these filters
+            </div>
           ) : (
-            jobs.map(job => (
+            jobs.map((job) => (
               <JobCard
                 key={job.id}
                 job={job}
@@ -452,10 +646,11 @@ export default function JobBoard() {
       </div>
 
       <div className="pane-right">
-        {selected
-          ? <JobDetail job={selected} />
-          : <div className="detail-empty">Select a job to view details</div>
-        }
+        {selected ? (
+          <JobDetail job={selected} />
+        ) : (
+          <div className="detail-empty">Select a job to view details</div>
+        )}
       </div>
     </div>
   );
